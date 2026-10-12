@@ -1,0 +1,29 @@
+{
+  "name": "MoJ Scorecard",
+  "dataColors": ["#12355B", "#1B9AAA", "#7A8CA3", "#C9A227", "#6B4E9B", "#2E7D6B", "#B5473A", "#4B5563"],
+  "background": "#FFFFFF",
+  "foreground": "#1F2937",
+  "foregroundNeutralSecondary": "#4B5563",
+  "tableAccent": "#12355B",
+  "good": "#1E7B4F",
+  "neutral": "#E0A800",
+  "bad": "#C0392B",
+  "textClasses": {
+    "callout": { "fontSize": 44, "fontFace": "Segoe UI Semibold", "color": "#12355B" },
+    "title":   { "fontSize": 20, "fontFace": "Segoe UI Semibold", "color": "#1F2937" },
+    "header":  { "fontSize": 16, "fontFace": "Segoe UI Semibold", "color": "#1F2937" },
+    "label":   { "fontSize": 14, "fontFace": "Segoe UI", "color": "#4B5563" }
+  },
+  "visualStyles": {
+    "page": {
+      "*": {
+        "background": [{ "color": { "solid": { "color": "#F3F5F8" } }, "transparency": 0 }]
+      }
+    },
+    "*": {
+      "*": {
+        "*": [{ "fontSize": 14, "fontFamily": "Segoe UI" }]
+      }
+    }
+  }
+}

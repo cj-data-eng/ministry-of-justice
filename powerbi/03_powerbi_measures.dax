@@ -1,0 +1,128 @@
+// =====================================================================
+// Project 1: Power BI measures. Data is SYNTHETIC.
+// Create each item via Modeling > New table / New measure.
+// RULE: every rate is SUM(numerator) / SUM(denominator), never an average of percentages.
+// =====================================================================
+
+
+// ---------- CALCULATED TABLES (Modeling > New table) ----------
+
+Dim Date =
+ADDCOLUMNS (
+    CALENDAR ( DATE ( 2026, 1, 1 ), DATE ( 2026, 6, 30 ) ),
+    "Month", FORMAT ( [Date], "MMM YYYY" ),
+    "Month Sort", YEAR ( [Date] ) * 100 + MONTH ( [Date] ),
+    "Week Start", [Date] - WEEKDAY ( [Date], 2 ) + 1
+)
+
+Dim Jurisdiction =
+DISTINCT ( fact_kpi_daily[jurisdiction] )
+
+
+// ---------- REALTIME CHANNELS (voice / webchat) ----------
+
+Offered = SUM ( fact_kpi_daily[offered] )
+
+Service Level =
+DIVIDE ( SUM ( fact_kpi_daily[answered_in_threshold] ), SUM ( fact_kpi_daily[offered] ) )
+
+Answer Rate =
+DIVIDE ( SUM ( fact_kpi_daily[answered] ), SUM ( fact_kpi_daily[offered] ) )
+
+Abandonment Rate =
+DIVIDE ( SUM ( fact_kpi_daily[abandoned] ), SUM ( fact_kpi_daily[offered] ) )
+
+AHT (sec) =
+DIVIDE ( SUM ( fact_kpi_daily[valid_handle_seconds] ), SUM ( fact_kpi_daily[valid_handle_count] ) )
+
+
+// ---------- EMAIL / ADMIN ----------
+
+Received = SUM ( fact_kpi_daily[received] )
+
+Completed = SUM ( fact_kpi_daily[completed] )
+
+Turnaround Rate =
+DIVIDE ( SUM ( fact_kpi_daily[completed_in_target] ), SUM ( fact_kpi_daily[completed] ) )
+
+// Backlog is a balance, not a flow: take the LAST day in the current filter, never sum across days.
+Closing Backlog =
+VAR LastDay = MAX ( fact_kpi_daily[work_date] )
+RETURN
+    CALCULATE ( SUM ( fact_kpi_daily[closing_backlog] ), fact_kpi_daily[work_date] = LastDay )
+
+
+// ---------- CAPACITY ----------
+
+Occupancy =
+DIVIDE ( SUM ( fact_kpi_daily[handle_minutes] ), SUM ( fact_kpi_daily[available_minutes] ) )
+
+Adherence =
+DIVIDE ( SUM ( fact_kpi_daily[in_adherence_minutes] ), SUM ( fact_kpi_daily[scheduled_work_minutes] ) )
+
+Shrinkage =
+DIVIDE (
+    SUM ( fact_kpi_daily[absence_minutes] ) + SUM ( fact_kpi_daily[break_minutes] ),
+    SUM ( fact_kpi_daily[scheduled_minutes] )
+)
+
+
+// ---------- TARGETS AND RAG STATUS ----------
+
+Service Level Target = 0.80
+Abandonment Target = 0.05
+Adherence Target = 0.90
+
+// Green = on target, Amber = within 5 points, Red = more than 5 points below.
+// The amber band is a design choice: state it on the page.
+Service Level RAG =
+VAR v = [Service Level]
+RETURN
+    SWITCH (
+        TRUE (),
+        ISBLANK ( v ), BLANK (),
+        v >= [Service Level Target], "Green",
+        v >= [Service Level Target] - 0.05, "Amber",
+        "Red"
+    )
+
+Service Level RAG Colour =
+SWITCH (
+    [Service Level RAG],
+    "Green", "#2E7D32",
+    "Amber", "#F9A825",
+    "Red", "#C62828",
+    BLANK ()
+)
+
+
+// ---------- AGENT / TEAM SCORECARD (uses fact_agent_daily) ----------
+
+Agent AHT (sec) =
+DIVIDE ( SUM ( fact_agent_daily[valid_handle_seconds] ), SUM ( fact_agent_daily[valid_handle_count] ) )
+
+Agent Adherence =
+DIVIDE ( SUM ( fact_agent_daily[in_adherence_minutes] ), SUM ( fact_agent_daily[scheduled_work_minutes] ) )
+
+Avg QA Score = AVERAGE ( fact_agent_daily[qa_score] )
+
+Contacts Handled = SUM ( fact_agent_daily[handled_count] )
+
+Team AHT (sec) =
+CALCULATE ( [Agent AHT (sec)], ALLEXCEPT ( fact_agent_daily, fact_agent_daily[team_id] ) )
+
+// Positive = slower than team. Use for coaching conversations, not as a verdict on the agent.
+AHT vs Team % =
+DIVIDE ( [Agent AHT (sec)] - [Team AHT (sec)], [Team AHT (sec)] )
+
+Coaching Flag =
+VAR ahtGap = [AHT vs Team %]
+VAR adh = [Agent Adherence]
+RETURN
+    SWITCH (
+        TRUE (),
+        ahtGap > 0.20 && adh < 0.85, "AHT + adherence",
+        ahtGap > 0.20, "AHT",
+        adh < 0.85, "Adherence",
+        "OK"
+    )
